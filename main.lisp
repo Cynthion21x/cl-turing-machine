@@ -98,27 +98,72 @@
 ;; program (state rule-0 rule-1)
 ;; rule (value dir next-state) or :halt -halt
 
+;; string parser
 (defun parse-string (str &optional (state 0))
-  (let ((first (position #\_ str)))
+  (let ((first (position #\_ str))
+	(state-code
+	  (intern (string
+		   (code-char (+ state (char-code #\A)))))))
     (if first
-	(append
-	 (parse-chunk (subseq str 0 first))
-	 (parse-string (subseq str (1+ first) (length str))))
-	(parse-chunk str))))
+	(cons
+	 (parse-chunk (subseq str 0 first) state-code)
+	 (parse-string
+	  (subseq str (1+ first) (length str))
+	  (1+ state)))
+	(list (parse-chunk str state-code)))))
 
 (defun parse-chunk (str state)
-  )
+  `(,state
+    ,(parse-bit (subseq str 0 3))
+    ,(parse-bit (subseq str 3 6))
+    ))
+
+(defun parse-bit (str)
+  (if (equal str "---")
+      :halt
+      `(,(digit-char-p (char str 0))
+	,(r-l (char str 1))
+	,(intern (string (char str 2))))))
+
+(defun r-l (str)
+  (if (eq #\R str)
+      :right
+      :left))
+
+;; Turn a string into a setup machine
+(defun new-machine (str)
+  (make-machine
+   :state 'A
+   :tape (make-tape :head 0)
+   :instructions (parse-string str)))
 
 ;; Testing
 ;;1RB1LB_1LC0RA_---1LB
-(defparameter the-instructions '((A (1 :right B) (1 :left B))
-			   (B (1 :left C) (0 :right A))
-			   (C :halt (1 :left B))))
+;;(defparameter the-instructions '((A (1 :right B) (1 :left B))
+;;			   (B (1 :left C) (0 :right A))
+;;			   (C :halt (1 :left B))))
+;;
+;;(defparameter the-tape (make-tape
+;;		  :head 0))
+;;
+;;(defparameter the-machine (make-machine
+;;		     :state 'A
+;;		     :tape the-tape
+;;		     :instructions the-instructions))
+;;
+;;(print-tape (machine-tape (update-machine (new-machine "1RB1LB_1LC0RA_---1LB"))))
 
-(defparameter the-tape (make-tape
-		  :head 0))
+(defun run-until-halt (str)
+  (runner (new-machine str) '()))
 
-(defparameter the-machine (make-machine
-		     :state 'A
-		     :tape the-tape
-		     :instructions the-instructions))
+(defun runner (ma iters)
+  (cond
+    ((eq (machine-state ma) :halt) iters)
+    (
+     (runner (update-machine ma)
+	     (append iters
+		     (list (print-tape-nohead (machine-tape ma))))))))
+
+(defun print-iterations (i)
+  (loop for x in i
+	do (print x)))
